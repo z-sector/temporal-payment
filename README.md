@@ -1,57 +1,57 @@
 # temporal-payment
 
-Пример payment workflow на Go SDK Temporal. Шаги не двигают деньги: они пишут запрос в лог.
+A payment workflow example built with the Temporal Go SDK. The steps do not move money; they log the request.
 
-## Что запускается в Docker Compose
+## Docker Compose
 
-Долгоживущие сервисы:
+Long-running services:
 
-- PostgreSQL — persistence Temporal
+- PostgreSQL — Temporal persistence
 - Elasticsearch — visibility
 - Temporal Server — gRPC `localhost:7233`
 - Temporal Web UI — http://localhost:8080
 
-`temporal-admin-tools` и `temporal-create-namespace` — одноразовые init-контейнеры. Они создают схему Postgres, индекс Elasticsearch и namespace `default`, затем завершаются. Worker и client в compose нет.
+`temporal-admin-tools` and `temporal-create-namespace` are one-shot init containers. They create the Postgres schema, the Elasticsearch index, and the `default` namespace, then exit. Start the worker and client with Go; they are not part of Compose.
 
-Скрипты схемы взяты из [temporalio/samples-server](https://github.com/temporalio/samples-server/tree/main/compose). В `create-namespace.sh` исправлена опечатка `MAX_ATTdMPTS`, из-за которой повтор создания namespace падал при `set -u`.
+Schema scripts come from [temporalio/samples-server](https://github.com/temporalio/samples-server/tree/main/compose).
 
-## Запуск
+## Run
 
 ```bash
 docker compose up
 ```
 
-Дождитесь в логе `Namespace 'default' created` или `Namespace 'default' already exists`.
+Wait until the log says `Namespace 'default' created` or `Namespace 'default' already exists`.
 
-В другом терминале запустите worker:
+In another terminal, start the worker:
 
 ```bash
 go run ./worker
 ```
 
-Клиент отправляет `from`, `to`, `value` и ключ идемпотентности:
+The client sends `from`, `to`, `value`, and an idempotency key:
 
 ```bash
 go run ./starter -from bob -to carol -value 100 -idempotency-key pay-ok-1
 ```
 
-Адрес кластера по умолчанию — `127.0.0.1:7233`. Другой адрес задаётся через `TEMPORAL_ADDRESS`.
+The cluster address defaults to `127.0.0.1:7233`. Set `TEMPORAL_ADDRESS` to use another address.
 
-Ключ идемпотентности становится Workflow ID. Повторный старт с тем же `-idempotency-key` не создаёт второй workflow. Для каждого шага workflow передаёт свой стабильный ключ, один и тот же на всех retry:
+The idempotency key becomes the workflow ID. Starting again with the same `-idempotency-key` does not create a second workflow. Each step receives its own stable key, and retries of that step reuse it:
 
 - `{idempotency-key}:hold`
 - `{idempotency-key}:antifraud`
 - `{idempotency-key}:transfer`
 - `{idempotency-key}:refund`
 
-## Сценарии
+## Scenarios
 
-Префиксы проверяются как есть, строчные `f` и `a`.
+Prefixes are matched exactly, lowercase `f` and `a`.
 
-- `bob` → `carol` — холд, антифрод, перевод. Статус `completed`.
-- `frank` → `carol` — `from` начинается с `f`, холд отвечает «недостаточно средств». Возврата нет. Статус `insufficient_funds`.
-- `alice` → `carol` или `bob` → `ann` — антифрод не проходит, workflow возвращает холд. Статус `antifraud_rejected`.
+- `bob` to `carol` — hold, antifraud, transfer. Status `completed`.
+- `frank` to `carol` — `from` starts with `f`, so the hold reports insufficient funds. There is no refund. Status `insufficient_funds`.
+- `alice` to `carol`, or `bob` to `ann` — antifraud rejects the payment and the workflow refunds the hold. Status `antifraud_rejected`.
 
-На каждой попытке activity результат срабатывает с вероятностью 30%. Иначе activity пишет в лог `Unavailable` вместе с ключом идемпотентности шага и возвращает retryable-ошибку. Temporal повторяет вызов: первая пауза 1 секунда, дальше backoff до 5 секунд, без лимита попыток.
+Each activity attempt returns the real result with a 30% probability. Otherwise the activity logs `Unavailable` together with the step idempotency key and returns a retryable error. Temporal retries the call, starting with a 1 second pause and backing off up to 5 seconds, with no attempt limit.
 
-В логе worker видны и `Unavailable`, и итоговый результат шага. История workflow открывается в Web UI.
+The worker log shows both `Unavailable` and the final step result. The workflow history is in the Web UI.
