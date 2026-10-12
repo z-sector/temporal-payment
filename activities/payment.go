@@ -21,14 +21,14 @@ func (a *Activities) Hold(ctx context.Context, input payment.StepInput) error {
 		return err
 	}
 	if strings.HasPrefix(input.From, "f") {
-		logStep(ctx, "недостаточно средств", input)
+		logStep(ctx, "insufficient funds", input)
 		return temporal.NewNonRetryableApplicationError(
-			"недостаточно средств",
+			"insufficient funds",
 			payment.ErrInsufficientFunds,
 			nil,
 		)
 	}
-	logStep(ctx, "холдирование", input)
+	logStep(ctx, "hold", input)
 	return nil
 }
 
@@ -38,14 +38,14 @@ func (a *Activities) CheckAntifraud(ctx context.Context, input payment.StepInput
 		return err
 	}
 	if strings.HasPrefix(input.From, "a") || strings.HasPrefix(input.To, "a") {
-		logStep(ctx, "антифрод: проверка не пройдена", input)
+		logStep(ctx, "antifraud check rejected", input)
 		return temporal.NewNonRetryableApplicationError(
-			"антифрод: проверка не пройдена",
+			"antifraud check rejected",
 			payment.ErrAntifraudRejected,
 			nil,
 		)
 	}
-	logStep(ctx, "антифрод: проверка пройдена", input)
+	logStep(ctx, "antifraud check passed", input)
 	return nil
 }
 
@@ -54,7 +54,7 @@ func (a *Activities) Transfer(ctx context.Context, input payment.StepInput) erro
 	if err := a.gate(ctx, input); err != nil {
 		return err
 	}
-	logStep(ctx, "перевод", input)
+	logStep(ctx, "transfer", input)
 	return nil
 }
 
@@ -63,7 +63,7 @@ func (a *Activities) Refund(ctx context.Context, input payment.StepInput) error 
 	if err := a.gate(ctx, input); err != nil {
 		return err
 	}
-	logStep(ctx, "возврат холдированных средств", input)
+	logStep(ctx, "refund held funds", input)
 	return nil
 }
 
@@ -80,7 +80,7 @@ func (a *Activities) gate(ctx context.Context, input payment.StepInput) error {
 		"to", input.To,
 		"value", input.Value,
 	)
-	return temporal.NewApplicationError("сервис недоступен", payment.ErrUnavailable)
+	return temporal.NewApplicationError("service unavailable", payment.ErrUnavailable)
 }
 
 func logStep(ctx context.Context, message string, input payment.StepInput) {
