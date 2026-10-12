@@ -18,14 +18,14 @@ import (
 )
 
 func main() {
-	from := flag.String("from", "", "счёт отправителя")
-	to := flag.String("to", "", "счёт получателя")
-	value := flag.Int64("value", 0, "сумма")
-	key := flag.String("idempotency-key", "", "ключ идемпотентности платежа и workflow ID")
+	from := flag.String("from", "", "sender account")
+	to := flag.String("to", "", "recipient account")
+	value := flag.Int64("value", 0, "amount")
+	key := flag.String("idempotency-key", "", "payment idempotency key and workflow ID")
 	flag.Parse()
 
 	if *from == "" || *to == "" || *key == "" {
-		fmt.Fprintln(os.Stderr, "флаги -from, -to и -idempotency-key обязательны")
+		fmt.Fprintln(os.Stderr, "-from, -to, and -idempotency-key are required")
 		flag.Usage()
 		os.Exit(2)
 	}
@@ -53,7 +53,7 @@ func main() {
 	if err != nil {
 		var already *serviceerror.WorkflowExecutionAlreadyStarted
 		if errors.As(err, &already) {
-			log.Fatalf("платёж с ключом идемпотентности %q уже существует", *key)
+			log.Fatalf("payment with idempotency key %q already exists", *key)
 		}
 		log.Fatalln("Unable to execute workflow", err)
 	}

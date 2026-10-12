@@ -16,7 +16,7 @@ func PaymentWorkflow(ctx workflow.Context, input payment.Input) (payment.Result,
 	logger := workflow.GetLogger(ctx)
 	ctx = withActivityOptions(ctx)
 
-	logger.Info("старт платежа",
+	logger.Info("payment started",
 		"idempotency_key", input.IdempotencyKey,
 		"from", input.From,
 		"to", input.To,
@@ -52,12 +52,12 @@ func PaymentWorkflow(ctx workflow.Context, input payment.Input) (payment.Result,
 func refund(ctx workflow.Context, input payment.StepInput) error {
 	disconnectedCtx, _ := workflow.NewDisconnectedContext(ctx)
 	compCtx := withActivityOptions(disconnectedCtx)
-	workflow.GetLogger(ctx).Info("возврат холдированных средств", "idempotency_key", input.IdempotencyKey)
+	workflow.GetLogger(ctx).Info("refund held funds", "idempotency_key", input.IdempotencyKey)
 	return workflow.ExecuteActivity(compCtx, payment.RefundActivity, input).Get(compCtx, nil)
 }
 
 func finish(ctx workflow.Context, status string) (payment.Result, error) {
-	workflow.GetLogger(ctx).Info("платёж завершён", "status", status)
+	workflow.GetLogger(ctx).Info("payment finished", "status", status)
 	return payment.Result{Status: status}, nil
 }
 
