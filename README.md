@@ -46,11 +46,26 @@ The idempotency key becomes the workflow ID. Starting again with the same `-idem
 
 ## Scenarios
 
-Prefixes are matched exactly, lowercase `f` and `a`.
+Prefixes are matched exactly, lowercase `f` and `a`. Use a new `-idempotency-key` for each payment.
 
-- `bob` to `carol` — hold, antifraud, transfer. Status `completed`.
-- `frank` to `carol` — `from` starts with `f`, so the hold reports insufficient funds. There is no refund. Status `insufficient_funds`.
-- `alice` to `carol`, or `bob` to `ann` — antifraud rejects the payment and the workflow refunds the hold. Status `antifraud_rejected`.
+Hold, antifraud, and transfer. Status `completed`:
+
+```bash
+go run ./starter -from bob -to carol -value 100 -idempotency-key pay-ok-1
+```
+
+`from` starts with `f`, so the hold reports insufficient funds. There is no refund. Status `insufficient_funds`:
+
+```bash
+go run ./starter -from frank -to carol -value 50 -idempotency-key pay-nofunds-1
+```
+
+`from` or `to` starts with `a`, so antifraud rejects the payment and the workflow refunds the hold. Status `antifraud_rejected`:
+
+```bash
+go run ./starter -from alice -to carol -value 75 -idempotency-key pay-fraud-from-1
+go run ./starter -from bob -to ann -value 80 -idempotency-key pay-fraud-to-1
+```
 
 Each activity attempt returns the real result with a 30% probability. Otherwise the activity logs `Unavailable` together with the step idempotency key and returns a retryable error. Temporal retries the call, starting with a 1 second pause and backing off up to 5 seconds, with no attempt limit.
 
