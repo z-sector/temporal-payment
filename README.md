@@ -46,7 +46,7 @@ The idempotency key becomes the workflow ID. Starting again with the same `-idem
 
 ## Scenarios
 
-Prefixes are matched exactly, lowercase `f` and `a`. Use a new `-idempotency-key` for each payment.
+Prefixes are matched exactly, lowercase `f`, `a`, and `u`. Use a new `-idempotency-key` for each payment.
 
 Hold, antifraud, and transfer. Status `completed`:
 
@@ -67,6 +67,12 @@ go run ./starter -from alice -to carol -value 75 -idempotency-key pay-fraud-from
 go run ./starter -from bob -to ann -value 80 -idempotency-key pay-fraud-to-1
 ```
 
-Each activity attempt returns the real result with a 30% probability. Otherwise the activity logs `Unavailable` together with the step idempotency key and returns a retryable error. Temporal retries the call, starting with a 1 second pause and backing off up to 5 seconds, with no attempt limit.
+`from` starts with `u`, so hold and antifraud run, then transfer returns `Unavailable` on each of three attempts and the workflow fails. The starter exits with that error. The running worker remembers the failure count for `{idempotency-key}:transfer`. Leave that process running and reset the workflow in the Web UI to the workflow task before Transfer, or to the first workflow task. Reset starts a new run with the same workflow ID, the same worker performs the transfer, and the run completes. Restarting the worker drops the count, and the reset fails again.
+
+```bash
+go run ./starter -from uma -to carol -value 100 -idempotency-key pay-transfer-down-1
+```
+
+Each activity attempt returns the real result with a 30% probability. Otherwise the activity logs `Unavailable` together with the step idempotency key and returns a retryable error. Temporal retries the call, starting with a 1 second pause and backing off up to 5 seconds, with no attempt limit. The `u` transfer does not use that probability: every attempt is `Unavailable`, and the workflow stops after three.
 
 The worker log shows both `Unavailable` and the final step result. The workflow history is in the Web UI.

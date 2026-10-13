@@ -1,6 +1,19 @@
 package payment
 
+import "strings"
+
 const TaskQueue = "payment"
+
+// TransferOutageAttempts is how many times Transfer returns Unavailable when
+// the sender name starts with "u". The next call, after those failures, performs
+// the transfer. The workflow stops retrying at the same count.
+const TransferOutageAttempts int32 = 3
+
+// TransferOutage reports whether this sender forces Transfer down for
+// TransferOutageAttempts calls.
+func TransferOutage(from string) bool {
+	return strings.HasPrefix(from, "u")
+}
 
 const (
 	HoldActivity           = "Hold"
