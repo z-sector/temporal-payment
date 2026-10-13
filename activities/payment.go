@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/rand/v2"
 	"strings"
+	"sync"
 
 	"github.com/z-sector/temporal-payment/payment"
 
@@ -13,7 +14,14 @@ import (
 
 // Activities logs payment steps. It does not move money.
 // Exported method names must match the activity name constants in the payment package.
-type Activities struct{}
+//
+// transferFailures is process memory for the transfer outage. The worker registers
+// one Activities value and must keep that process running: the count is how a later
+// Transfer call, after the workflow has already failed, knows to perform the transfer.
+type Activities struct {
+	mu               sync.Mutex
+	transferFailures map[string]int
+}
 
 // Hold places a hold. A from account that starts with "f" has insufficient funds.
 func (a *Activities) Hold(ctx context.Context, input payment.StepInput) error {
@@ -50,12 +58,36 @@ func (a *Activities) CheckAntifraud(ctx context.Context, input payment.StepInput
 }
 
 // Transfer records a successful transfer.
+// A from account that starts with "u" returns Unavailable until this process has
+// recorded TransferOutageAttempts failures for the step key. The next call transfers.
 func (a *Activities) Transfer(ctx context.Context, input payment.StepInput) error {
+	if payment.TransferOutage(input.From) {
+		if a.recordTransferOutage(input.IdempotencyKey) {
+			return unavailable(ctx, input)
+		}
+		logStep(ctx, "transfer", input)
+		return nil
+	}
 	if err := a.gate(ctx, input); err != nil {
 		return err
 	}
 	logStep(ctx, "transfer", input)
 	return nil
+}
+
+// recordTransferOutage reports whether this call is still inside the outage.
+// The first TransferOutageAttempts calls for a key fail. Later calls do not.
+func (a *Activities) recordTransferOutage(key string) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.transferFailures == nil {
+		a.transferFailures = make(map[string]int)
+	}
+	if a.transferFailures[key] >= int(payment.TransferOutageAttempts) {
+		return false
+	}
+	a.transferFailures[key]++
+	return true
 }
 
 // Refund records a release of the held amount.
@@ -73,6 +105,10 @@ func (a *Activities) gate(ctx context.Context, input payment.StepInput) error {
 	if rand.Float64() < 0.3 {
 		return nil
 	}
+	return unavailable(ctx, input)
+}
+
+func unavailable(ctx context.Context, input payment.StepInput) error {
 	activity.GetLogger(ctx).Info("Unavailable",
 		"step", activity.GetInfo(ctx).ActivityType.Name,
 		"idempotency_key", input.IdempotencyKey,
