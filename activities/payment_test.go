@@ -36,8 +36,7 @@ func TestTransferOutageStoresKeyThenTransfers(t *testing.T) {
 				continue
 			}
 			recorded = true
-			var appErr *temporal.ApplicationError
-			if !errors.As(err, &appErr) || appErr.Type() != payment.ErrUnavailable {
+			if !transferDown(err) {
 				t.Fatalf("first stored call returned %v", err)
 			}
 			continue
@@ -96,7 +95,7 @@ func TestTransferWithoutOutageDoesNotStoreKey(t *testing.T) {
 }
 
 // recordOutage calls Transfer until the outage key is stored. That call must
-// return Unavailable. It reports whether the key was stored within the loop.
+// return TransferDown. It reports whether the key was stored within the loop.
 func recordOutage(t *testing.T, env *testsuite.TestActivityEnvironment, a *Activities, input payment.StepInput) bool {
 	t.Helper()
 	for i := 0; i < 200; i++ {
@@ -107,13 +106,17 @@ func recordOutage(t *testing.T, env *testsuite.TestActivityEnvironment, a *Activ
 			}
 			continue
 		}
-		var appErr *temporal.ApplicationError
-		if !errors.As(err, &appErr) || appErr.Type() != payment.ErrUnavailable {
+		if !transferDown(err) {
 			t.Fatalf("first stored call returned %v", err)
 		}
 		return true
 	}
 	return false
+}
+
+func transferDown(err error) bool {
+	var appErr *temporal.ApplicationError
+	return errors.As(err, &appErr) && appErr.Type() == payment.ErrTransferDown && appErr.NonRetryable()
 }
 
 func transferUntilSuccess(t *testing.T, env *testsuite.TestActivityEnvironment, a *Activities, input payment.StepInput) error {

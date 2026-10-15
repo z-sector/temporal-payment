@@ -94,12 +94,12 @@ make scenario-fraud-to
 
 `make scenarios` runs those targets one after another and ends with `scenario-transfer-down`. Each gets its own key.
 
-`from` starts with `u`, so hold and antifraud run, then transfer uses the same 30% gate as the other steps. The first call that passes the gate stores `{idempotency-key}:transfer` and still returns `Unavailable`. A later call that passes the gate and finds that key performs the transfer. Temporal keeps retrying until that happens, and the workflow completes. Restarting the worker drops the stored keys, so the next call records the key again before a later call can transfer.
+`from` starts with `u`, so hold and antifraud run, then transfer uses the same 30% gate as the other steps. The first call that passes the gate stores `{idempotency-key}:transfer` and returns `TransferDown`. That error is not retried, so the workflow fails and the starter exits with it. `make scenarios` reaches this target last and exits with the same error. Leave the worker running and reset the workflow in the Web UI to the workflow task before Transfer, or to the first workflow task. Reset starts a new run with the same workflow ID. The same worker finds the stored key and performs the transfer. Restarting the worker drops the stored keys, so the reset stores the key again and fails the same way.
 
 ```bash
 make scenario-transfer-down
 ```
 
-Each activity attempt returns the real result with a 30% probability. Otherwise the activity logs `Unavailable` together with the step idempotency key and returns a retryable error. Temporal retries the call, starting with a 1 second pause and backing off up to 5 seconds, with no attempt limit. Transfer for a `u` sender uses that same gate. The first success stores the step key and returns `Unavailable`. The next success for a stored key performs the transfer.
+Each activity attempt returns the real result with a 30% probability. Otherwise the activity logs `Unavailable` together with the step idempotency key and returns a retryable error. Temporal retries the call, starting with a 1 second pause and backing off up to 5 seconds, with no attempt limit. Transfer for a `u` sender uses that same gate. The first success stores the step key and returns non-retryable `TransferDown`. The next success for a stored key performs the transfer.
 
 The worker log shows both `Unavailable` and the final step result. The workflow history is in the Web UI.

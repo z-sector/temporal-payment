@@ -20,6 +20,7 @@ const (
 	ErrUnavailable       = "Unavailable"
 	ErrInsufficientFunds = "InsufficientFunds"
 	ErrAntifraudRejected = "AntifraudRejected"
+	ErrTransferDown      = "TransferDown"
 )
 
 const (

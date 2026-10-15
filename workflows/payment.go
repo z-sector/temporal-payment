@@ -78,6 +78,7 @@ func activityOptions() workflow.ActivityOptions {
 			NonRetryableErrorTypes: []string{
 				payment.ErrInsufficientFunds,
 				payment.ErrAntifraudRejected,
+				payment.ErrTransferDown,
 			},
 		},
 	}
