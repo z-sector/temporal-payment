@@ -15,12 +15,12 @@ import (
 // Activities logs payment steps. It does not move money.
 // Exported method names must match the activity name constants in the payment package.
 //
-// transferFailures is process memory for the transfer outage. The worker registers
+// seenTransfers is process memory for the transfer outage. The worker registers
 // one Activities value and must keep that process running: the first call stores
 // the step key, and a later Transfer call for that key performs the transfer.
 type Activities struct {
-	mu               sync.Mutex
-	transferFailures map[string]int
+	mu            sync.Mutex
+	seenTransfers map[string]struct{}
 }
 
 // Hold places a hold. A from account that starts with "f" has insufficient funds.
@@ -77,15 +77,15 @@ func (a *Activities) Transfer(ctx context.Context, input payment.StepInput) erro
 func (a *Activities) recordTransferOutage(ctx context.Context, input payment.StepInput) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.transferFailures == nil {
-		a.transferFailures = make(map[string]int)
+	if a.seenTransfers == nil {
+		a.seenTransfers = make(map[string]struct{})
 	}
 	key := input.IdempotencyKey
-	if _, seen := a.transferFailures[key]; seen {
+	if _, seen := a.seenTransfers[key]; seen {
 		logStep(ctx, "transfer", input)
 		return nil
 	}
-	a.transferFailures[key] = 1
+	a.seenTransfers[key] = struct{}{}
 	return unavailable(ctx, input)
 }
 

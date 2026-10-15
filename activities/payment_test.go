@@ -27,7 +27,7 @@ func TestTransferOutageStoresKeyThenTransfers(t *testing.T) {
 	transferred := false
 	for i := 0; i < 200 && !transferred; i++ {
 		_, err := env.ExecuteActivity(a.Transfer, input)
-		_, seen := a.transferFailures[input.IdempotencyKey]
+		_, seen := a.seenTransfers[input.IdempotencyKey]
 		if !recorded {
 			if err == nil {
 				t.Fatal("transfer completed before the key was stored")
@@ -39,9 +39,6 @@ func TestTransferOutageStoresKeyThenTransfers(t *testing.T) {
 			var appErr *temporal.ApplicationError
 			if !errors.As(err, &appErr) || appErr.Type() != payment.ErrUnavailable {
 				t.Fatalf("first stored call returned %v", err)
-			}
-			if a.transferFailures[input.IdempotencyKey] != 1 {
-				t.Fatalf("stored count = %d, want 1", a.transferFailures[input.IdempotencyKey])
 			}
 			continue
 		}
@@ -55,8 +52,8 @@ func TestTransferOutageStoresKeyThenTransfers(t *testing.T) {
 	if !transferred {
 		t.Fatal("stored key never performed the transfer")
 	}
-	if a.transferFailures[input.IdempotencyKey] != 1 {
-		t.Fatalf("stored count = %d, want 1", a.transferFailures[input.IdempotencyKey])
+	if _, seen := a.seenTransfers[input.IdempotencyKey]; !seen {
+		t.Fatal("transfer dropped the stored key")
 	}
 }
 
@@ -78,8 +75,8 @@ func TestTransferOutageKeysAreIndependent(t *testing.T) {
 	if err := transferUntilSuccess(t, env, a, second); err != nil {
 		t.Fatal(err)
 	}
-	if a.transferFailures[first.IdempotencyKey] != 1 {
-		t.Fatalf("first key count = %d, want 1", a.transferFailures[first.IdempotencyKey])
+	if _, seen := a.seenTransfers[first.IdempotencyKey]; !seen {
+		t.Fatal("transfer of the second key dropped the first key")
 	}
 }
 
@@ -93,8 +90,8 @@ func TestTransferWithoutOutageDoesNotStoreKey(t *testing.T) {
 	if err := transferUntilSuccess(t, env, a, input); err != nil {
 		t.Fatal(err)
 	}
-	if len(a.transferFailures) != 0 {
-		t.Fatalf("non-outage transfer stored %#v", a.transferFailures)
+	if len(a.seenTransfers) != 0 {
+		t.Fatalf("non-outage transfer stored %#v", a.seenTransfers)
 	}
 }
 
@@ -104,7 +101,7 @@ func recordOutage(t *testing.T, env *testsuite.TestActivityEnvironment, a *Activ
 	t.Helper()
 	for i := 0; i < 200; i++ {
 		_, err := env.ExecuteActivity(a.Transfer, input)
-		if _, seen := a.transferFailures[input.IdempotencyKey]; !seen {
+		if _, seen := a.seenTransfers[input.IdempotencyKey]; !seen {
 			if err == nil {
 				t.Fatal("transfer completed before the key was stored")
 			}
