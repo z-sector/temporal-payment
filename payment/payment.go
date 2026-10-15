@@ -1,14 +1,6 @@
 package payment
 
-import "strings"
-
 const TaskQueue = "payment"
-
-// TransferOutage reports whether this sender must be remembered before a later
-// Transfer call can perform the transfer.
-func TransferOutage(from string) bool {
-	return strings.HasPrefix(from, "u")
-}
 
 const (
 	HoldActivity           = "Hold"

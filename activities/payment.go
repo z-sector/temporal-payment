@@ -65,7 +65,7 @@ func (a *Activities) Transfer(ctx context.Context, input payment.StepInput) erro
 	if err := a.gate(ctx, input); err != nil {
 		return err
 	}
-	if payment.TransferOutage(input.From) {
+	if strings.HasPrefix(input.From, "u") {
 		return a.recordTransferOutage(ctx, input)
 	}
 	logStep(ctx, "transfer", input)
