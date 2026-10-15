@@ -37,12 +37,14 @@ In another terminal, start the worker and leave it running:
 make worker
 ```
 
-Run one payment, or the four scenarios that finish with a status:
+The worker holds that terminal. From the repository root, in any other terminal, run one payment or the four scenarios that finish with a status:
 
 ```bash
 make scenario-ok
 make scenarios
 ```
+
+`make scenario-ok` is the one payment. `make scenarios` runs `scenario-ok`, `scenario-nofunds`, `scenario-fraud-from`, and `scenario-fraud-to`.
 
 Stop the cluster and delete its volumes:
 
