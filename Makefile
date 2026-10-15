@@ -31,7 +31,7 @@ help:
 		'scenario-nofunds         insufficient funds (from starts with f)' \
 		'scenario-fraud-from      antifraud reject (from starts with a)' \
 		'scenario-fraud-to        antifraud reject (to starts with a)' \
-		'scenario-transfer-down   u-prefix transfer; usually fails within three attempts' \
+		'scenario-transfer-down   u-prefix transfer; first stored call is Unavailable' \
 		'scenarios                ok, nofunds, fraud-from, fraud-to, transfer-down' \
 		'' \
 		'KEY=pay-ok-1 make scenario-ok   pin the workflow ID for one scenario'
@@ -60,5 +60,4 @@ scenario-fraud-to:
 scenario-transfer-down:
 	go run ./starter -from uma -to carol -value 100 -idempotency-key $(if $(KEY),$(KEY),pay-transfer-down-$(run_suffix))
 
-# scenario-transfer-down is last. Its starter usually exits non-zero, so this target usually does too.
 scenarios: scenario-ok scenario-nofunds scenario-fraud-from scenario-fraud-to scenario-transfer-down

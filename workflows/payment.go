@@ -42,18 +42,11 @@ func PaymentWorkflow(ctx workflow.Context, input payment.Input) (payment.Result,
 		return payment.Result{}, err
 	}
 
-	err = executeTransfer(ctx, input)
+	err = workflow.ExecuteActivity(ctx, payment.TransferActivity, input.Step(payment.StepTransfer)).Get(ctx, nil)
 	if err != nil {
 		return payment.Result{}, err
 	}
 	return finish(ctx, payment.StatusCompleted)
-}
-
-func executeTransfer(ctx workflow.Context, input payment.Input) error {
-	if payment.TransferOutage(input.From) {
-		ctx = workflow.WithActivityOptions(ctx, activityOptions(payment.TransferOutageAttempts))
-	}
-	return workflow.ExecuteActivity(ctx, payment.TransferActivity, input.Step(payment.StepTransfer)).Get(ctx, nil)
 }
 
 func refund(ctx workflow.Context, input payment.StepInput) error {
@@ -69,10 +62,10 @@ func finish(ctx workflow.Context, status string) (payment.Result, error) {
 }
 
 func withActivityOptions(ctx workflow.Context) workflow.Context {
-	return workflow.WithActivityOptions(ctx, activityOptions(0))
+	return workflow.WithActivityOptions(ctx, activityOptions())
 }
 
-func activityOptions(maxAttempts int32) workflow.ActivityOptions {
+func activityOptions() workflow.ActivityOptions {
 	return workflow.ActivityOptions{
 		StartToCloseTimeout: 10 * time.Second,
 		RetryPolicy: &temporal.RetryPolicy{
@@ -80,10 +73,8 @@ func activityOptions(maxAttempts int32) workflow.ActivityOptions {
 			BackoffCoefficient: 2,
 			// Keep Unavailable retries short enough to watch in the worker log.
 			MaximumInterval: 5 * time.Second,
-			// A zero MaximumAttempts retries until the activity succeeds. The transfer
-			// outage sets this to TransferOutageAttempts. The run fails unless a later
-			// attempt both passes the gate and finds the key already recorded.
-			MaximumAttempts: maxAttempts,
+			// A zero MaximumAttempts retries until the activity succeeds.
+			MaximumAttempts: 0,
 			NonRetryableErrorTypes: []string{
 				payment.ErrInsufficientFunds,
 				payment.ErrAntifraudRejected,

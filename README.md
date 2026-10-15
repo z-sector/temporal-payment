@@ -44,7 +44,7 @@ make scenario-ok
 make scenarios
 ```
 
-`make scenario-ok` is the one payment. `make scenarios` runs `scenario-ok`, `scenario-nofunds`, `scenario-fraud-from`, `scenario-fraud-to`, and `scenario-transfer-down`. The last of those usually exits non-zero, so `make scenarios` usually does too.
+`make scenario-ok` is the one payment. `make scenarios` runs `scenario-ok`, `scenario-nofunds`, `scenario-fraud-from`, `scenario-fraud-to`, and `scenario-transfer-down`.
 
 Stop the cluster and delete its volumes:
 
@@ -94,12 +94,12 @@ make scenario-fraud-to
 
 `make scenarios` runs those targets one after another and ends with `scenario-transfer-down`. Each gets its own key.
 
-`from` starts with `u`, so hold and antifraud run, then transfer uses the same 30% gate as the other steps. The first call that passes the gate stores `{idempotency-key}:transfer` and still returns `Unavailable`. A later call that passes the gate and finds that key performs the transfer. The workflow stops after three attempts, so this scenario usually fails before that second success. The starter then exits with an error, and so does `make scenarios`. Leave the worker running and reset the failed workflow in the Web UI to the workflow task before Transfer, or to the first workflow task. Reset starts a new run with the same workflow ID. When the key is already stored, the next call that passes the gate performs the transfer and the run completes. Restarting the worker drops the map, and the reset records the key again before it can transfer.
+`from` starts with `u`, so hold and antifraud run, then transfer uses the same 30% gate as the other steps. The first call that passes the gate stores `{idempotency-key}:transfer` and still returns `Unavailable`. A later call that passes the gate and finds that key performs the transfer. Temporal keeps retrying until that happens, and the workflow completes. Restarting the worker drops the stored keys, so the next call records the key again before a later call can transfer.
 
 ```bash
 make scenario-transfer-down
 ```
 
-Each activity attempt returns the real result with a 30% probability. Otherwise the activity logs `Unavailable` together with the step idempotency key and returns a retryable error. Temporal retries the call, starting with a 1 second pause and backing off up to 5 seconds, with no attempt limit. Transfer for a `u` sender uses that same gate. The first success stores the step key and returns `Unavailable`. The next success for a stored key performs the transfer. The workflow stops that activity after three attempts.
+Each activity attempt returns the real result with a 30% probability. Otherwise the activity logs `Unavailable` together with the step idempotency key and returns a retryable error. Temporal retries the call, starting with a 1 second pause and backing off up to 5 seconds, with no attempt limit. Transfer for a `u` sender uses that same gate. The first success stores the step key and returns `Unavailable`. The next success for a stored key performs the transfer.
 
 The worker log shows both `Unavailable` and the final step result. The workflow history is in the Web UI.
