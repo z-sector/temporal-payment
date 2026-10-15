@@ -17,7 +17,8 @@ import (
 //
 // seenTransfers is process memory for the transfer outage. The worker registers
 // one Activities value and must keep that process running: the first call stores
-// the step key, and a later Transfer call for that key performs the transfer.
+// the step key and returns TransferDown. A later Transfer call for that key,
+// after the workflow is reset, performs the transfer.
 type Activities struct {
 	mu            sync.Mutex
 	seenTransfers map[string]struct{}
@@ -60,7 +61,7 @@ func (a *Activities) CheckAntifraud(ctx context.Context, input payment.StepInput
 // Transfer records a successful transfer.
 // Every call starts at the availability gate. A from account that starts with "u"
 // is stored on the first call that passes the gate, and that call returns
-// Unavailable. A later call for a key already in the map performs the transfer.
+// TransferDown. A later call for a key already in the map performs the transfer.
 func (a *Activities) Transfer(ctx context.Context, input payment.StepInput) error {
 	if err := a.gate(ctx, input); err != nil {
 		return err
@@ -73,7 +74,7 @@ func (a *Activities) Transfer(ctx context.Context, input payment.StepInput) erro
 }
 
 // recordTransferOutage stores the step key the first time it is seen and returns
-// Unavailable. When the key is already in the map, it performs the transfer.
+// TransferDown. When the key is already in the map, it performs the transfer.
 func (a *Activities) recordTransferOutage(ctx context.Context, input payment.StepInput) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -86,7 +87,12 @@ func (a *Activities) recordTransferOutage(ctx context.Context, input payment.Ste
 		return nil
 	}
 	a.seenTransfers[key] = struct{}{}
-	return unavailable(ctx, input)
+	logStep(ctx, "transfer down", input)
+	return temporal.NewNonRetryableApplicationError(
+		"transfer down",
+		payment.ErrTransferDown,
+		nil,
+	)
 }
 
 // Refund records a release of the held amount.

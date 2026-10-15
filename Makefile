@@ -31,7 +31,7 @@ help:
 		'scenario-nofunds         insufficient funds (from starts with f)' \
 		'scenario-fraud-from      antifraud reject (from starts with a)' \
 		'scenario-fraud-to        antifraud reject (to starts with a)' \
-		'scenario-transfer-down   u-prefix transfer; first stored call is Unavailable' \
+		'scenario-transfer-down   u-prefix transfer fails with TransferDown once the key is stored' \
 		'scenarios                ok, nofunds, fraud-from, fraud-to, transfer-down' \
 		'' \
 		'KEY=pay-ok-1 make scenario-ok   pin the workflow ID for one scenario'
