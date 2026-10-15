@@ -3,7 +3,7 @@
 #   make up        docker compose up -d
 #   make down      docker compose down -v
 #   make worker    go run ./worker
-#   make scenarios one new run of each completing scenario
+#   make scenarios one new run of each scenario, ending with transfer-down
 #
 # The idempotency key is the workflow ID. A second start with the same key is
 # rejected, so each scenario run appends a new suffix unless KEY is set:
@@ -32,7 +32,7 @@ help:
 		'scenario-fraud-from      antifraud reject (from starts with a)' \
 		'scenario-fraud-to        antifraud reject (to starts with a)' \
 		'scenario-transfer-down   transfer stays Unavailable; starter exits non-zero' \
-		'scenarios                ok, nofunds, fraud-from, fraud-to' \
+		'scenarios                ok, nofunds, fraud-from, fraud-to, transfer-down' \
 		'' \
 		'KEY=pay-ok-1 make scenario-ok   pin the workflow ID for one scenario'
 
@@ -60,5 +60,5 @@ scenario-fraud-to:
 scenario-transfer-down:
 	go run ./starter -from uma -to carol -value 100 -idempotency-key $(if $(KEY),$(KEY),pay-transfer-down-$(run_suffix))
 
-# The transfer-down starter exits with an error on purpose, so it stays its own target.
-scenarios: scenario-ok scenario-nofunds scenario-fraud-from scenario-fraud-to
+# scenario-transfer-down is last. Its starter exits non-zero, so this target does too.
+scenarios: scenario-ok scenario-nofunds scenario-fraud-from scenario-fraud-to scenario-transfer-down

@@ -37,14 +37,14 @@ In another terminal, start the worker and leave it running:
 make worker
 ```
 
-The worker holds that terminal. From the repository root, in any other terminal, run one payment or the four scenarios that finish with a status:
+The worker holds that terminal. From the repository root, in any other terminal, run one payment or every scenario:
 
 ```bash
 make scenario-ok
 make scenarios
 ```
 
-`make scenario-ok` is the one payment. `make scenarios` runs `scenario-ok`, `scenario-nofunds`, `scenario-fraud-from`, and `scenario-fraud-to`.
+`make scenario-ok` is the one payment. `make scenarios` runs `scenario-ok`, `scenario-nofunds`, `scenario-fraud-from`, `scenario-fraud-to`, and `scenario-transfer-down`. The last of those exits non-zero, so `make scenarios` does too.
 
 Stop the cluster and delete its volumes:
 
@@ -92,9 +92,9 @@ make scenario-fraud-from
 make scenario-fraud-to
 ```
 
-`make scenarios` runs those four targets one after another. Each gets its own key.
+`make scenarios` runs those targets one after another and ends with `scenario-transfer-down`. Each gets its own key.
 
-`from` starts with `u`, so hold and antifraud run, then transfer returns `Unavailable` on each of three attempts and the workflow fails. The starter exits with that error, so this target is not part of `make scenarios`. The running worker remembers the failure count for `{idempotency-key}:transfer`. Leave that process running and reset the workflow in the Web UI to the workflow task before Transfer, or to the first workflow task. Reset starts a new run with the same workflow ID, the same worker performs the transfer, and the run completes. Restarting the worker drops the count, and the reset fails again.
+`from` starts with `u`, so hold and antifraud run, then transfer returns `Unavailable` on each of three attempts and the workflow fails. The starter exits with that error, and so does `make scenarios`. The running worker remembers the failure count for `{idempotency-key}:transfer`. Leave that process running and reset the workflow in the Web UI to the workflow task before Transfer, or to the first workflow task. Reset starts a new run with the same workflow ID, the same worker performs the transfer, and the run completes. Restarting the worker drops the count, and the reset fails again.
 
 ```bash
 make scenario-transfer-down
