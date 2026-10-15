@@ -21,7 +21,7 @@ func main() {
 
 	w := worker.New(c, payment.TaskQueue, worker.Options{})
 	w.RegisterWorkflow(workflows.PaymentWorkflow)
-	// One value for the process lifetime. Transfer's outage count is stored here.
+	// One value for the process lifetime. Transfer's outage memory is stored here.
 	w.RegisterActivity(&activities.Activities{})
 
 	log.Printf("worker started, task queue %s", payment.TaskQueue)
