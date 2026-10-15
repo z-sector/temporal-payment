@@ -81,7 +81,8 @@ func activityOptions(maxAttempts int32) workflow.ActivityOptions {
 			// Keep Unavailable retries short enough to watch in the worker log.
 			MaximumInterval: 5 * time.Second,
 			// A zero MaximumAttempts retries until the activity succeeds. The transfer
-			// outage sets this to TransferOutageAttempts so the workflow fails instead.
+			// outage sets this to TransferOutageAttempts. The run fails unless a later
+			// attempt both passes the gate and finds the key already recorded.
 			MaximumAttempts: maxAttempts,
 			NonRetryableErrorTypes: []string{
 				payment.ErrInsufficientFunds,

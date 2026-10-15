@@ -16,8 +16,8 @@ import (
 // Exported method names must match the activity name constants in the payment package.
 //
 // transferFailures is process memory for the transfer outage. The worker registers
-// one Activities value and must keep that process running: the count is how a later
-// Transfer call, after the workflow has already failed, knows to perform the transfer.
+// one Activities value and must keep that process running: the first call stores
+// the step key, and a later Transfer call for that key performs the transfer.
 type Activities struct {
 	mu               sync.Mutex
 	transferFailures map[string]int
@@ -58,36 +58,35 @@ func (a *Activities) CheckAntifraud(ctx context.Context, input payment.StepInput
 }
 
 // Transfer records a successful transfer.
-// A from account that starts with "u" returns Unavailable until this process has
-// recorded TransferOutageAttempts failures for the step key. The next call transfers.
+// Every call starts at the availability gate. A from account that starts with "u"
+// is stored on the first call that passes the gate, and that call returns
+// Unavailable. A later call for a key already in the map performs the transfer.
 func (a *Activities) Transfer(ctx context.Context, input payment.StepInput) error {
-	if payment.TransferOutage(input.From) {
-		if a.recordTransferOutage(input.IdempotencyKey) {
-			return unavailable(ctx, input)
-		}
-		logStep(ctx, "transfer", input)
-		return nil
-	}
 	if err := a.gate(ctx, input); err != nil {
 		return err
+	}
+	if payment.TransferOutage(input.From) {
+		return a.recordTransferOutage(ctx, input)
 	}
 	logStep(ctx, "transfer", input)
 	return nil
 }
 
-// recordTransferOutage reports whether this call is still inside the outage.
-// The first TransferOutageAttempts calls for a key fail. Later calls do not.
-func (a *Activities) recordTransferOutage(key string) bool {
+// recordTransferOutage stores the step key the first time it is seen and returns
+// Unavailable. When the key is already in the map, it performs the transfer.
+func (a *Activities) recordTransferOutage(ctx context.Context, input payment.StepInput) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.transferFailures == nil {
 		a.transferFailures = make(map[string]int)
 	}
-	if a.transferFailures[key] >= int(payment.TransferOutageAttempts) {
-		return false
+	key := input.IdempotencyKey
+	if _, seen := a.transferFailures[key]; seen {
+		logStep(ctx, "transfer", input)
+		return nil
 	}
-	a.transferFailures[key]++
-	return true
+	a.transferFailures[key] = 1
+	return unavailable(ctx, input)
 }
 
 // Refund records a release of the held amount.
